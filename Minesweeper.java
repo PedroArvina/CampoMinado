@@ -2,235 +2,211 @@ package campominado12;
 
 import java.awt.*;
 import java.awt.event.*;
-import javax.swing.*;
 import java.util.Random;
+import javax.swing.*;
 
-public class CampoMinado {
-    abstract class Celula extends JButton {
-        int linha;
-        int coluna;
-        boolean aberta;
-        boolean temMina;
+public class App {
+    public static class Minesweeper {
+        private abstract class Cell extends JButton {
+            int Linha;
+            int Coluna;
+            boolean CAberta;
 
-        public Celula(int linha, int coluna) {
-            this.linha = linha;
-            this.coluna = coluna;
-            this.aberta = false;
-            this.temMina = false;
+            public Cell(int Linha, int Coluna) {
+                this.Linha = Linha;
+                this.Coluna = Coluna;
+                this.CAberta = false;
+            }
 
-            setFocusable(false);
-            setMargin(new Insets(0, 0, 0, 0));
-            setFont(new Font("Arial", Font.PLAIN, 25));
-            setBorder(BorderFactory.createLineBorder(Color.BLACK));
-            setBackground(Color.LIGHT_GRAY);
+            public abstract boolean isBomb();
 
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mousePressed(MouseEvent e) {
-                    if (FimDeJogo || aberta) {
-                        return;
-                    }
-                    if (e.getButton() == MouseEvent.BUTTON1) {
-                        revelar();
-                        checarVitoria();
-                    } else if (e.getButton() == MouseEvent.BUTTON3) {
-                        marcar();
-                    }
+            public abstract void onClick();
+
+            public void abrir() {
+                if (CAberta) {
+                    return;
                 }
-            });
-        }
 
-        abstract void revelar();
+                CAberta = true;
+                setBackground(Color.WHITE);
 
-        void marcar() {
-            if (!aberta) {
-                setText(getText().equals("🚩") ? "" : "🚩");
+                onClick();
             }
         }
-    }
 
-    class Bomba extends Celula {
-        public Bomba(int linha, int coluna) {
-            super(linha, coluna);
-            this.temMina = true;
-        }
+        private class BombCell extends Cell {
+            boolean CTemMina;
 
-        @Override
-        void revelar() {
-            if (!getText().equals("🚩")) {
+            public BombCell(int Linha, int Coluna) {
+                super(Linha, Coluna);
+                this.CTemMina = true;
+            }
+
+            @Override
+            public boolean isBomb() {
+                return true;
+            }
+
+            @Override
+            public void onClick() {
                 setText("O");
-                setBackground(Color.RED);
-                aberta = true;
                 mostrarBombas();
             }
         }
-    }
 
-    class VizinhaDeBomba extends Celula {
-        int minasAdjacentes;
+        private class EmptyCell extends Cell {
+            int minasEncontradas;
 
-        public VizinhaDeBomba(int linha, int coluna, int minasAdjacentes) {
-            super(linha, coluna);
-            this.minasAdjacentes = minasAdjacentes;
-        }
+            public EmptyCell(int Linha, int Coluna) {
+                super(Linha, Coluna);
+                this.minasEncontradas = 0;
+            }
 
-        @Override
-        void revelar() {
-            if (!aberta && !getText().equals("🚩")) {
-                setText(minasAdjacentes > 0 ? Integer.toString(minasAdjacentes) : "");
-                setBackground(Color.WHITE);
-                aberta = true;
-                if (minasAdjacentes == 0) {
-                    abridorEmCadeia(linha, coluna);
+            @Override
+            public boolean isBomb() {
+                return false;
+            }
+
+            @Override
+            public void onClick() {
+                if (minasEncontradas > 0) {
+                    setText(Integer.toString(minasEncontradas));
+                } else {
+                    abridorEmCadeia(Linha, Coluna);
+                }
+
+                NumeroDeQuadradosClicados++;
+
+                if (NumeroDeQuadradosClicados == NumeroDeLinhasTotal * NumeroDeColunasTotal - QuantidadeDeBombasNaPartida) {
+                    FimDeJogo = true;
+                    TextoDeTopo.setText("Mines Cleared!");
                 }
             }
         }
-    }
 
-    class EspacoVazio extends Celula {
-        public EspacoVazio(int linha, int coluna) {
-            super(linha, coluna);
-        }
+        int TamanhoDosQuadradinhos = 40;
+        int NumeroDeLinhasTotal = 32;
+        int NumeroDeColunasTotal = NumeroDeLinhasTotal;
+        int LarguraTabuleiro = NumeroDeColunasTotal * TamanhoDosQuadradinhos;
+        int AlturaTabuleiro = NumeroDeLinhasTotal * TamanhoDosQuadradinhos;
 
-        @Override
-        void revelar() {
-            if (!aberta && !getText().equals("🚩")) {
-                setBackground(Color.WHITE);
-                aberta = true;
-                abridorEmCadeia(linha, coluna);
+        JFrame JanelaInicial = new JFrame("Campo Minado");
+        JLabel TextoDeTopo = new JLabel();
+        JPanel PainelDoTexto = new JPanel();
+        JPanel PainelDosQuadradinhos = new JPanel();
+
+        int QuantidadeDeBombasNaPartida = 100;
+        Cell[][] MatrizDoTabuleiro = new Cell[NumeroDeLinhasTotal][NumeroDeColunasTotal];
+        Random random = new Random();
+
+        int NumeroDeQuadradosClicados = 0;
+        boolean FimDeJogo = false;
+
+        Minesweeper() {
+            JanelaInicial.setSize(LarguraTabuleiro, AlturaTabuleiro);
+            JanelaInicial.setLocationRelativeTo(null);
+            JanelaInicial.setResizable(false);
+            JanelaInicial.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            JanelaInicial.setLayout(new BorderLayout());
+
+            TextoDeTopo.setFont(new Font("Arial", Font.BOLD, 25));
+            TextoDeTopo.setHorizontalAlignment(JLabel.CENTER);
+            TextoDeTopo.setText("Campo Minado: " + Integer.toString(QuantidadeDeBombasNaPartida));
+            TextoDeTopo.setOpaque(true);
+
+            PainelDoTexto.setLayout(new BorderLayout());
+            PainelDoTexto.add(TextoDeTopo);
+            JanelaInicial.add(PainelDoTexto, BorderLayout.NORTH);
+
+            PainelDosQuadradinhos.setLayout(new GridLayout(NumeroDeLinhasTotal, NumeroDeColunasTotal));
+            JanelaInicial.add(PainelDosQuadradinhos);
+
+            for (int Linha = 0; Linha < NumeroDeLinhasTotal; Linha++) {
+                for (int Coluna = 0; Coluna < NumeroDeColunasTotal; Coluna++) {
+                    Cell Quadrado;
+                    if (random.nextInt(100) < QuantidadeDeBombasNaPartida) {
+                        Quadrado = new BombCell(Linha, Coluna);
+                        QuantidadeDeBombasNaPartida--;
+                    } else {
+                        Quadrado = new EmptyCell(Linha, Coluna);
+                    }
+
+                    MatrizDoTabuleiro[Linha][Coluna] = Quadrado;
+
+                    Quadrado.setFocusable(false);
+                    Quadrado.setMargin(new Insets(0, 0, 0, 0));
+                    Quadrado.setFont(new Font("Minecraft Evenings", Font.PLAIN, 25));
+                    Quadrado.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                    Quadrado.setBackground(Color.LIGHT_GRAY);
+
+                    Quadrado.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mousePressed(MouseEvent e) {
+                            if (FimDeJogo || Quadrado.CAberta) {
+                                return;
+                            }
+                            if (e.getButton() == MouseEvent.BUTTON1) {
+                                Quadrado.abrir();
+                            } else if (e.getButton() == MouseEvent.BUTTON3) {
+                                if (!Quadrado.CAberta) {
+                                    enfiaBandeira(Quadrado);
+                                }
+                            }
+                        }
+                    });
+
+                    PainelDosQuadradinhos.add(Quadrado);
+                }
             }
-        }
-    }
 
-    // Propriedades do Campo Minado
-    int TamanhoDosQuadradinhos = 40;
-    int NumeroDeLinhasTotal = 10;
-    int NumeroDeColunasTotal = 10;
-    int QuantidadeDeBombasNaPartida = 10;
-    Celula[][] MatrizDoTabuleiro = new Celula[NumeroDeLinhasTotal][NumeroDeColunasTotal];
-    Random random = new Random();
-    boolean FimDeJogo = false;
-    JFrame JanelaInicial = new JFrame("Campo Minado");
-    JLabel TextoDeTopo = new JLabel();
-    JPanel PainelDoTexto = new JPanel();
-    JPanel PainelDosQuadradinhos = new JPanel();
-
-    CampoMinado() {
-        JanelaInicial.setSize(NumeroDeColunasTotal * TamanhoDosQuadradinhos, NumeroDeLinhasTotal * TamanhoDosQuadradinhos + 50);
-        JanelaInicial.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        JanelaInicial.setLayout(new BorderLayout());
-
-        TextoDeTopo.setFont(new Font("Arial", Font.BOLD, 18));
-        TextoDeTopo.setHorizontalAlignment(JLabel.CENTER);
-        TextoDeTopo.setText("Campo Minado");
-        PainelDoTexto.setLayout(new BorderLayout());
-        PainelDoTexto.add(TextoDeTopo, BorderLayout.NORTH);
-        JanelaInicial.add(PainelDoTexto, BorderLayout.NORTH);
-
-        PainelDosQuadradinhos.setLayout(new GridLayout(NumeroDeLinhasTotal, NumeroDeColunasTotal));
-        JanelaInicial.add(PainelDosQuadradinhos, BorderLayout.CENTER);
-
-        for (int linha = 0; linha < NumeroDeLinhasTotal; linha++) {
-            for (int coluna = 0; coluna < NumeroDeColunasTotal; coluna++) {
-                EspacoVazio espaco = new EspacoVazio(linha, coluna);
-                MatrizDoTabuleiro[linha][coluna] = espaco;
-                PainelDosQuadradinhos.add(espaco);
-            }
+            JanelaInicial.setVisible(true);
         }
 
-        distribuidorDeBombas();
-        JanelaInicial.setVisible(true);
-    }
-
-    void distribuidorDeBombas() {
-        for (int i = 0; i < QuantidadeDeBombasNaPartida; i++) {
-            int linha, coluna;
-            do {
-                linha = random.nextInt(NumeroDeLinhasTotal);
-                coluna = random.nextInt(NumeroDeColunasTotal);
-            } while (MatrizDoTabuleiro[linha][coluna].temMina);
-
-            MatrizDoTabuleiro[linha][coluna] = new Bomba(linha, coluna);
-            atualizarVizinhanca(linha, coluna);
-        }
-    }
-
-    void atualizarVizinhanca(int linhaBomba, int colunaBomba) {
-        for (int dr = -1; dr <= 1; dr++) {
-            for (int dc = -1; dc <= 1; dc++) {
-                int nr = linhaBomba + dr;
-                int nc = colunaBomba + dc;
-                if (nr >= 0 && nr < NumeroDeLinhasTotal && nc >= 0 && nc < NumeroDeColunasTotal) {
-                    Celula celula = MatrizDoTabuleiro[nr][nc];
-                    if (!(celula instanceof Bomba)) {
-                        int minas = contarMinas(nr, nc);
-                        MatrizDoTabuleiro[nr][nc] = new VizinhaDeBomba(nr, nc, minas);
+        void mostrarBombas() {
+            for (int Linha = 0; Linha < NumeroDeLinhasTotal; Linha++) {
+                for (int Coluna = 0; Coluna < NumeroDeColunasTotal; Coluna++) {
+                    Cell Quadrado = MatrizDoTabuleiro[Linha][Coluna];
+                    if (Quadrado.isBomb()) {
+                        Quadrado.setText("O");
                     }
                 }
             }
-        }
-    }
 
-    int contarMinas(int linha, int coluna) {
-        int minas = 0;
-        for (int dr = -1; dr <= 1; dr++) {
-            for (int dc = -1; dc <= 1; dc++) {
-                int nr = linha + dr;
-                int nc = coluna + dc;
-                if (nr >= 0 && nr < NumeroDeLinhasTotal && nc >= 0 && nc < NumeroDeColunasTotal) {
-                    if (MatrizDoTabuleiro[nr][nc] instanceof Bomba) {
-                        minas++;
-                    }
-                }
-            }
-        }
-        return minas;
-    }
-
-    void abridorEmCadeia(int linha, int coluna) {
-        for (int dr = -1; dr <= 1; dr++) {
-            for (int dc = -1; dc <= 1; dc++) {
-                int nr = linha + dr;
-                int nc = coluna + dc;
-                if (nr >= 0 && nr < NumeroDeLinhasTotal && nc >= 0 && nc < NumeroDeColunasTotal) {
-                    MatrizDoTabuleiro[nr][nc].revelar();
-                }
-            }
-        }
-    }
-
-    void mostrarBombas() {
-        for (int linha = 0; linha < NumeroDeLinhasTotal; linha++) {
-            for (int coluna = 0; coluna < NumeroDeColunasTotal; coluna++) {
-                if (MatrizDoTabuleiro[linha][coluna] instanceof Bomba) {
-                    MatrizDoTabuleiro[linha][coluna].revelar();
-                }
-            }
-        }
-        FimDeJogo = true;
-        TextoDeTopo.setText("Game Over!");
-    }
-
-    void checarVitoria() {
-        int contador = 0;
-        for (int linha = 0; linha < NumeroDeLinhasTotal; linha++) {
-            for (int coluna = 0; coluna < NumeroDeColunasTotal; coluna++) {
-                Celula cel = MatrizDoTabuleiro[linha][coluna];
-                if (cel.aberta || cel.temMina) {
-                    contador++;
-                }
-            }
-        }
-        if (contador == NumeroDeLinhasTotal * NumeroDeColunasTotal) {
             FimDeJogo = true;
-            TextoDeTopo.setText("Você Venceu!");
+            TextoDeTopo.setText("Game Over!");
+        }
+
+        void abridorEmCadeia(int Linha, int Coluna) {
+            for (int dr = -1; dr <= 1; dr++) {
+                for (int dc = -1; dc <= 1; dc++) {
+                    int nr = Linha + dr;
+                    int nc = Coluna + dc;
+                    if (nr >= 0 && nr < NumeroDeLinhasTotal && nc >= 0 && nc < NumeroDeColunasTotal) {
+                        Cell Quadrado = MatrizDoTabuleiro[nr][nc];
+                        if (!Quadrado.CAberta) {
+                            Quadrado.abrir();
+                        }
+                    }
+                }
+            }
+        }
+
+        void enfiaBandeira(Cell Quadrado) {
+            if (!Quadrado.CAberta) {
+                if (Quadrado.getText().isEmpty()) {
+                    Quadrado.setText("🚩");
+                } else {
+                    Quadrado.setText("");
+                }
+            }
         }
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
+            @Override
             public void run() {
-                new CampoMinado();
+                new Minesweeper();
             }
         });
     }
